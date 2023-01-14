@@ -1,7 +1,7 @@
 # SH-PUNCH
 
 <center>
-![](./logo-punch.png)
+![](logo-punch.png)
 </center>
 
 The remote working punching application that follows the UNIX

@@ -1,8 +1,25 @@
 # SH-PUNCH
 
-Time tracking command line utility.
-
+<center>
 ![](./logo-punch.png)
+</center>
+
+The remote working punching application that follows the UNIX
+philosophy.
+
+An example:
+
+    > punch in
+    > punch out
+    > punch
+    You are out. You worked 6:16 hours today.
+    > punch in
+    > punch out
+    > cat ~/.punch/2023-01-13
+    in   08:06
+    out  14:22
+    in   14:58
+    out  16:43
 
 ## Help
 

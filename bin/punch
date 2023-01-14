@@ -1,0 +1,176 @@
+#!/bin/sh -e
+#L:
+#L:  MIT License
+#L:  
+#l:  Bug reports, feature requests to gemini|https://harkadev.com/oss
+#l:  Copyright (c) 2023 Harkaitz Agirre, harkaitz.aguirre@gmail.com
+#L:
+#L:  Permission is hereby granted, free of charge, to any person obtaining
+#L:  a copy of this software and associated documentation files (the
+#L:  "Software"), to deal in the Software without restriction, including
+#L:  without limitation the rights to use, copy, modify, merge, publish,
+#L:  distribute, sublicense, and/or sell copies of the Software, and to
+#L:  permit persons to whom the Software is furnished to do so, subject to
+#L:  the following conditions:
+#L:
+#L:  The above copyright notice and this permission notice shall be
+#L:  included in all copies or substantial portions of the Software.
+#L:
+#L:  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#L:  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#L:  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#L:  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+#L:  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+#L:  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+#L:  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##:
+#h: Usage: $0 COMMAND [PUNCH-FILE]
+#h:
+#h: Command line punching utility.
+#h:
+#h: ... show   : Show honored environment variables.
+#h:
+#h: ... in     : Register one's arrival to work.
+#h: ... out    : Register one's departure from work.
+#h: ... view   : View today's punch file.
+#h: ... time   : View the time you worked today.
+#h:
+#h: ... edit   : Edit today's punch file.
+#h: ... file   : Print today's punch file.
+#h: ... status : Print current status, can be "in" or "out".
+#h:
+#h: ... note TEXT : Add a note to the punch file.
+#h:
+#h: Examples:
+#h:
+#h:     > $0 in   : You start working.
+#h:     > $0 out  : You finished or took a break.
+#h:     > $0 time : View how much you worked today.
+
+
+##:
+punch() {
+    local cmd="$1"
+    shift
+    case "$cmd" in
+        'show')   punch_show_variables;;
+        ##
+        'in')     punch_in     "$@"  ;;
+        'out')    punch_out    "$@"  ;;
+        'view')   punch_view   "$@"  ;;
+        'edit')   punch_edit   "$@"  ;;
+        'time')   punch_time   "$@"  ;;
+        'note')   punch_note   "$@"  ;;
+        ##
+        'status') punch_status "$@"  ;;
+        'file')   punch_file   "$@"  ;;
+        *)        echo "Invalid argument: $cmd" >&2; return 1;;
+    esac
+}
+punch_show_variables() {
+    cat <<-EOF
+	PUNCH_DIRECTORY : $PUNCH_DIRECTORY
+	EDITOR          : ${EDITOR:-vi}
+	EOF
+}
+punch_calc_variables() {
+    PUNCH_DIRECTORY="${PUNCH_DIRECTORY:-${HOME}/.punch}"
+}
+## -------------------------------------------------------------------
+punch_file() { # Print the filename of the selected punch file.
+    if test -n "$1"; then
+        echo "$1"
+    else
+        echo "$PUNCH_DIRECTORY/`date +%Y-%m-%d`"
+    fi
+}
+punch_status() { # Print the status of the selected punch file, can be "in" or "out"
+    local f="`punch_file "$1"`"
+    if test ! -e "$f"; then
+        echo "out"
+    else
+        awk '
+        BEGIN       { status = "out"; }
+        $1 == "out" { status = "out"; }
+        $1 == "in"  { status = "in";  }
+        END         { print status;   }
+        ' "$f"
+    fi
+}
+punch_in() { # Add an "in" entry to the selected punch file.
+    local f="`punch_file   "$1"`"
+    local s="`punch_status "$f"`" 
+    if test @"$s" = @"in"; then
+        echo "You are already in." >&2
+        return 1
+    fi
+    mkdir -p "$PUNCH_DIRECTORY"
+    printf '%-4s %s\n' "in" "`date +%H:%M`" >> "$f"
+}
+punch_out() { # Add an "out" entry to the selected punch file.
+    local f="`punch_file   "$1"`"
+    local s="`punch_status "$f"`"
+    if test @"$s" = @"out"; then
+        echo "You are already out." >&2
+        return 1
+    fi
+    mkdir -p "$PUNCH_DIRECTORY"
+    printf '%-4s %s\n' "out" "`date +%H:%M`" >> "$f"
+}
+punch_note() {
+    local f="`punch_file`"
+    mkdir -p "$PUNCH_DIRECTORY"
+    printf '%-4s %s\n' "note" "$*" >> "$f"
+}
+punch_view() { # View the selected punch file with comments stripped.
+    local f="`punch_file   "$1"`"
+    local s="`punch_status "$f"`"
+    if test -e "$f"; then
+        sed -n '/^in /p;/^out /p;/^note /p' "$f"
+        if test @"$s" = @"in"; then
+            printf '%-4s %s (Pending)\n' "out" "`date +%H:%M`"
+        fi
+    fi
+}
+punch_edit() {
+    ${EDITOR:-nano} "${1:-`punch_file`}"
+}
+punch_time() { # Calculate the worked time of the selected punch file. 
+    punch_secs "$1" | awk '
+    BEGIN { secs = 0;   }
+          { secs += $2; }
+    END   { min = secs / 60;
+            printf "%i:%02i\n", min / 60, min % 60; }
+    '
+}
+punch_secs() { # Print the worked seconds of the working sessions.
+    local f="`  punch_file "$1"`"
+    local day="`basename   "$f"`"
+    local stat="out" i='' o=''
+    punch_view "$f" | while read -r dir time ign; do
+        case "$dir" in
+            'in')  stat="in"  i="`date -d "$day $time" "+%s"`" o='';;
+            'out') stat="out" o="`date -d "$day $time" "+%s"`"     ;;
+        esac
+        if test -n "$i" && test -n "$o"; then
+            printf '%-10s %s\n' "$time" $(( o - i ))
+            i='' o=''
+        fi
+    done
+}
+## -------------------------------------------------------------------
+punch_calc_variables
+SCRNAME="`basename "$0"`"
+if test @"${SCRNAME}" = @"punch"; then
+   case "${1}" in
+       '') echo "You are `punch status`. You worked `punch time` hours today."
+           ;;
+       -h|--help)
+           sed -n 's/^ *#h: \{0,1\}//p' "$0" | sed "s|\\\$0|${SCRNAME}|g"
+           echo ""
+           sed -n 's/^ *#l: \{0,2\}//p' "$0"
+           ;;
+        *) punch "$@"
+           ;;
+   esac
+fi

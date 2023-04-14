@@ -36,7 +36,7 @@ punch_files() {
     case "$cmd" in
         'show')  punch_files_show_variables  ;;
         'files') punch_files_files           ;;
-        'hours') punch_files_hours         ;;
+        'hours') punch_files_hours           ;;
         *)       echo "Invalid argument: $cmd" >&2; return 1;;
     esac
 }
@@ -47,9 +47,8 @@ punch_files_show_variables() {
 }
 ## -------------------------------------------------------------------
 punch_files_files() {
-    if test -d "$PUNCH_DIRECTORY"; then
-        find "$PUNCH_DIRECTORY" -type f -iregex '.*/[0-9\-][0-9\-]*$'
-    fi
+    test -d "$PUNCH_DIRECTORY"
+    find "$PUNCH_DIRECTORY" -type f -iregex '.*/[0-9\-][0-9\-]*$' | sort
 }
 punch_files_hours() {
     local f=''

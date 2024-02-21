@@ -99,7 +99,7 @@ punch_in() { # Add an "in" entry to the selected punch file.
     local s="`punch_status "$f"`" 
     if test @"$s" = @"in"; then
         echo "You are already in." >&2
-        return 1
+        return 0
     fi
     mkdir -p "$PUNCH_DIRECTORY"
     printf '%-4s %s\n' "in" "`date +%H:%M`" >> "$f"
@@ -109,7 +109,7 @@ punch_out() { # Add an "out" entry to the selected punch file.
     local s="`punch_status "$f"`"
     if test @"$s" = @"out"; then
         echo "You are already out." >&2
-        return 1
+        return 0
     fi
     mkdir -p "$PUNCH_DIRECTORY"
     printf '%-4s %s\n' "out" "`date +%H:%M`" >> "$f"
